@@ -1,8 +1,15 @@
 [package]
 name = "dirwiz"
 version = "0.1.0"
+authors = ["Alexander Sergeev <etc9053@gmail.com>"]
+description = "Directory traversal for interactive applications"
+documentation = "https://docs.rs/dirwiz/"
+homepage = "https://github.com/Gordon01/dirwiz"
+repository = "https://github.com/Gordon01/dirwiz"
+readme = "README.md"
+keywords = ["directory", "interactive", "walk", "iterator"]
+categories = ["filesystem"]
+license = "Unlicense/MIT"
 edition = "2021"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
