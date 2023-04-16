@@ -1,6 +1,7 @@
-use std::path::PathBuf;
+use std::path::{PathBuf, Path};
 
 type Item = (PathBuf, u64);
+
 pub struct DirWiz {
     path: PathBuf,
 }
@@ -17,6 +18,14 @@ pub struct IntoIter {
 }
 
 impl Stack {
+    /// Creates a stack with a single item containing a provided path.
+    fn from_path(path: PathBuf) -> Self {
+        Stack { stack: vec![path] }
+    }
+
+    /// Reads the subsequent directory in the stack and returns its size, or
+    /// `None` if it's empty. If directory contains other directories, they
+    /// would be added to the end of the stack. Symlinks are ignored.
     fn pop(&mut self) -> Option<Item> {
         let dir = self.stack.pop()?;
         let mut sum = 0;
@@ -34,37 +43,46 @@ impl Stack {
         Some((dir, sum))
     }
 
-    /*
-      Only the last top dir can have a stack, so we only need to copy it to resulting one.
-      Other dirs which came before are never read.
-      Sometimes all dirs are on same level, so we only need to break it one-to-one.
-      Stack should be evenly deep from the beginning. We only need to find a point where path length increases.
-    */
+    /// Consumes the stack and converts it into a `Vec`, each containing
+    /// a single directory from the original stack. If original stack contains
+    /// a partially-traversed directory then direcory's stack would be placed
+    /// into a single resulting element.
+    /// 
+    /// # Panics
+    ///
+    /// Panics if the source stack contains less than two entries
     fn explode(mut self) -> Vec<Self> {
         assert!(self.stack.len() > 1);
-        let top_len = self.stack.first().unwrap().components().count();
-        let mut res = if top_len != self.stack.last().unwrap().components().count() {
+
+        // SAFETY: It's safe to unwrap because vector is not empty
+        let first_len = self.stack.first().unwrap().components().count();
+        let last_len = self.stack.last().unwrap().components().count();
+        let mut res = if first_len != last_len {
             // Find a breaking point
-            let pos = self
+            let pos = match self
                 .stack
-                .binary_search_by(|p| p.components().count().cmp(&(top_len + 1)))
-                .unwrap();
-            println!("Splitting at: {pos}");
+                .binary_search_by(|p| p.components().count().cmp(&(first_len + 1)))
+            {
+                Ok(v) | Err(v) => v,
+            };
             let stack = self.stack.split_off(pos);
             vec![Stack { stack }]
         } else {
             Vec::with_capacity(self.stack.len())
         };
-        // Explode the rest one-to-one, because those items are still not traversed
-        res.extend(self.stack.into_iter().map(|p| Stack { stack: vec![p] }));
+        // Convert each path from the source to a separate stack
+        res.extend(self.stack.into_iter().map(|p| Stack::from_path(p)));
 
         res
     }
 }
 
 impl DirWiz {
-    pub fn new(path: impl Into<PathBuf>) -> Self {
-        Self { path: path.into() }
+    /// Creates a builder for a recursive directory iterator starting at the
+    /// file path `root`. `root` should be a directory otherwise the iterater
+    /// will yield zero items.
+    pub fn new(root: impl AsRef<Path>) -> Self {
+        Self { path: root.as_ref().to_path_buf() }
     }
 }
 
@@ -74,9 +92,7 @@ impl IntoIterator for DirWiz {
 
     fn into_iter(self) -> IntoIter {
         IntoIter {
-            work: vec![Stack {
-                stack: Vec::from([self.path]),
-            }],
+            work: vec![Stack::from_path(self.path)],
             index: 0,
         }
     }
@@ -119,8 +135,8 @@ impl IntoIter {
     }
 
     /// Returns a mutable reference to the current stack or `None` if `work` is empty.
-    /// If there is only one stack left and it has more than one element, it will be exploded into
-    /// smaller stacks to facilitate iteration.
+    /// If there is only one stack left and it has more than one element,
+    /// it will be exploded into smaller stacks.
     fn get_stack(&mut self) -> Option<&mut Stack> {
         println!("Work [{}]: {:?}", self.work.len(), self.work);
 
