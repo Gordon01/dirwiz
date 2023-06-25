@@ -71,7 +71,7 @@ impl Stack {
             Vec::with_capacity(self.stack.len())
         };
         // Convert each path from the source to a separate stack
-        res.extend(self.stack.into_iter().map(|p| Stack::from_path(p)));
+        res.extend(self.stack.into_iter().map(Stack::from_path));
 
         res
     }
